@@ -79,32 +79,33 @@ fn remove_from_list(
 ) -> String {
     let mut list = SHOPPING_LIST.lock().unwrap();
 
-    if items.eq("all") {
+    let resp = if items.eq("all") {
         match list.get_mut(&message.chat.id) {
             Some(v) => v.clear(),
             None => ()
         }
-        return "Removed all items from the shopping list".to_string();
-    }
+        "Removed all items from the shopping list".to_string()
+    } else {
         // parse tasks
-    let ids: Vec<usize> = items
-        .split_whitespace()
-        .map(|id_str| id_str.parse::<usize>())
-        .take_while(|x|x.is_ok())
-        .map(|x|x.ok().unwrap())
-        .collect();
-        
-    let resp = match list.get_mut(&message.chat.id) {
-        Some(v) =>  {
-            let mut out = String::new();
-            for id in ids {   
-                v.remove(id as usize);
-                println!("Removed sopping item: {:?}", id);
-                out = format!("{}Successfully removed item from list.\n", out);
-            }
-            out
-        },
-        None => format!("Not subbed to anything..."),
+        let ids: Vec<usize> = items
+            .split_whitespace()
+            .map(|id_str| id_str.parse::<usize>())
+            .take_while(|x|x.is_ok())
+            .map(|x|x.ok().unwrap())
+            .collect();
+            
+        match list.get_mut(&message.chat.id) {
+            Some(v) =>  {
+                let mut out = String::new();
+                for id in ids {   
+                    v.remove(id as usize);
+                    println!("Removed sopping item: {:?}", id);
+                    out = format!("{}Successfully removed item from list.\n", out);
+                }
+                out
+            },
+            None => format!("Not subbed to anything..."),
+        }
     };
     match serde_any::to_file("shopping_list.json", &*list) {
         Ok(_) => {();},
