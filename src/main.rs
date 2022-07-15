@@ -22,7 +22,7 @@ enum Command {
     #[command(description = "Add item to shopping list")]
     Add(String),
     #[command(description = "Remove item from shopping list after it's bought: /remove <item number>")]
-    Remove(i8),
+    Remove(String),
     #[command(description = "List all items to be bought")]
     List,
 }
@@ -45,8 +45,8 @@ async fn answer(
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
     match command {
         Command::Help           => { bot.send_message(message.chat.id, Command::descriptions().to_string()).await? },
-        Command::Add(item)    => { bot.send_message(message.chat.id, add_to_list(&bot, message, item)).await? },
-        Command::Remove(item_index)     => { bot.send_message(message.chat.id, remove_from_list(&bot, message, item_index)).await? },
+        Command::Add(items)    => { bot.send_message(message.chat.id, add_to_list(&bot, message, items)).await? },
+        Command::Remove(items)     => { bot.send_message(message.chat.id, remove_from_list(&bot, message, items)).await? },
         Command::List           => { bot.send_message(message.chat.id, display_list(&bot, message)).await? },
     };
     Ok(())
@@ -72,15 +72,34 @@ fn display_list(
 fn remove_from_list(
     _: &AutoSend<Bot>,
     message: Message,
-    item_index: i8,
+    items: String,
 ) -> String {
     let mut list = SHOPPING_LIST.lock().unwrap();
+
+    if items.eq("all") {
+        match list.get_mut(&message.chat.id) {
+            Some(v) => v.clear(),
+            None => ()
+        }
+        return "Removed all items from the shopping list".to_string();
+    }
+        // parse tasks
+    let ids: Vec<usize> = items
+        .split_whitespace()
+        .map(|id_str| id_str.parse::<usize>())
+        .take_while(|x|x.is_ok())
+        .map(|x|x.ok().unwrap())
+        .collect();
+        
     let resp = match list.get_mut(&message.chat.id) {
         Some(v) =>  {
-            v.remove(item_index as usize);
-            println!("Removed sopping item: {:?}", item_index);
-            println!("New state: {:?}", list);
-            format!("Successfully removed item from list.")
+            let mut out = String::new();
+            for id in ids {   
+                v.remove(id as usize);
+                println!("Removed sopping item: {:?}", id);
+                out = format!("{}Successfully removed item from list.\n", out);
+            }
+            out
         },
         None => format!("Not subbed to anything..."),
     };
@@ -94,20 +113,23 @@ fn remove_from_list(
 fn add_to_list(
     _: &AutoSend<Bot>,
     message: Message,
-    item: String,
+    items: String,
 ) -> String {
     let mut list = SHOPPING_LIST.lock().unwrap();
-    list.entry(message.chat.id).or_insert(Vec::new());
+    list.entry(message.chat.id).or_insert(Vec::new());    
     let resp = match list.get_mut(&message.chat.id) {
         Some(v) =>  {
-            if v.iter().find(|&x| *x == *item) == None {
-                v.push(item);
-                println!("New item: {:?}", list);
-                format!("Successfully added item to shopping list.")
-            } else {
-                println!("Existing item: {:?}", list);
-                format!("You already have the item on the list.")
+            let mut out = String::new();
+            for item_slice in items.split(",") {
+                let item = item_slice.trim().to_string();
+                if v.iter().find(|&x| *x == *item) == None {
+                    v.push(item.clone());
+                    out = format!("{}Successfully added item({}) to shopping list.\n", out, item);
+                } else {
+                    out = format!("{}You already have the item on the list.\n", out);
+                }
             }
+            out
         },
         None => format!("Something is not right..."),
     };
