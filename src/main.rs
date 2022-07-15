@@ -59,13 +59,16 @@ fn display_list(
     let mut subs = SHOPPING_LIST.lock().unwrap();
     match subs.get_mut(&message.chat.id) {
         Some(items) =>  {
+            if items.len() == 0 {
+                return format!("No items on list...")
+            }
             let mut out = "".to_string();
             for (i, x) in items.iter().enumerate() {
                 out = format!("{}\n{}\t\t{}", out, i, x);
             }
             out
         },
-        None => format!("Not subbed to anything..."),
+        None => format!("No items on list..."),
     }
 }
 
